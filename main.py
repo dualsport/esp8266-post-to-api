@@ -31,7 +31,7 @@ def main():
         value = randint(1, 1000)
         if not button.value():
             if not wlan.isconnected():
-                wifi_connect(wlan, secrets)
+                wifi_connect(wlan, secrets['access_points'])
             led.on()
             led2.off()
             p = api_post(TAG='test_integer',
@@ -47,14 +47,9 @@ def main():
                 led.off()
                 
             
-def wifi_connect(wlan, secrets):
+def wifi_connect(wlan, acc_pts):
     while not wlan.isconnected():
         print('\nConnecting to WiFi...')
-        with open('secrets.json') as f:
-            secrets = ujson.loads(f.read())
-        # List of allowed access points
-        acc_pts = secrets['access_points']
-        
         # Scan for available access points
         wifis = wlan.scan()
         # sort strongest to weakest signal
