@@ -3,7 +3,7 @@ import network
 import urequests
 import ujson
 import urandom
-import time
+import utime
 
 
 LED_PIN = 2  #D4
@@ -60,14 +60,18 @@ def wifi_connect(wlan, acc_pts):
             ssid = wifi[0].decode('utf-8')
             # Is it in list of allowed access points?
             if ssid in acc_pts:
+                print('Attempting to connect to ' + ssid)
+                start = utime.ticks_ms()
                 wlan.connect(ssid, acc_pts[ssid])
-                time.sleep(5.0)
+                while not wlan.isconnected():
+                    # Wait max of 10 seconds
+                    if utime.ticks_ms() - start > 10000:
+                        print('Failed to connect.')
+                        break
                 if wlan.isconnected():
                     print('Connected to ' + ssid)
                     print('Network config:', wlan.ifconfig())
                     return
-                else:
-                    continue
 
 
 def api_post(**kwargs):
