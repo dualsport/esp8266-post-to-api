@@ -3,6 +3,8 @@ import network
 import urequests
 import ujson
 import urandom
+import utime
+
 
 LED_PIN = 2  #D4
 LED2_PIN = 16  #D0
@@ -12,13 +14,72 @@ led2 = machine.Pin(LED2_PIN, machine.Pin.OUT)
 button = machine.Pin(BUUTON_PIN, machine.Pin.IN, machine.Pin.PULL_UP)
 
 
+def main():
+    print('\n\n')
+    with open('secrets.json') as f:
+        secrets = ujson.loads(f.read())
+        
+    # Turn off access point
+    ap = network.WLAN(network.AP_IF)
+    ap.active(False)
 
-def api_post(tag, value):
-    url = secrets['host'] + secrets['endpoint']
+    # Setup WiFi connection.
+    wlan = network.WLAN(network.STA_IF)
+
+    print('Ready...')
+    while True:
+        value = randint(1, 1000)
+        if not button.value():
+            if not wlan.isconnected():
+                wifi_connect(wlan, secrets['access_points'])
+            led.on()
+            led2.off()
+            p = api_post(TAG='test_integer',
+                         VALUE=value,
+                         HOST=secrets['host'],
+                         ENDPOINT=secrets['endpoint'],
+                         TOKEN=secrets['token']
+                         )
+            if p == 1:
+                led2.on()
+                led.off()
+            else:
+                led.off()
+                
+            
+def wifi_connect(wlan, acc_pts):
+    while not wlan.isconnected():
+        print('\nConnecting to WiFi...')
+        # Scan for available access points
+        wifis = wlan.scan()
+        # sort strongest to weakest signal
+        wifis.sort(key=lambda x: x[3], reverse=True)
+        
+        # Loop through available access points
+        for wifi in wifis:
+            ssid = wifi[0].decode('utf-8')
+            # Is it in list of allowed access points?
+            if ssid in acc_pts:
+                print('Attempting to connect to ' + ssid)
+                start = utime.ticks_ms()
+                wlan.connect(ssid, acc_pts[ssid])
+                while not wlan.isconnected():
+                    # Wait max of 10 seconds
+                    if utime.ticks_ms() - start > 10000:
+                        print('Failed to connect.')
+                        break
+                if wlan.isconnected():
+                    print('Connected to ' + ssid)
+                    print('Network config:', wlan.ifconfig())
+                    return
+
+
+def api_post(**kwargs):
+    url = kwargs['HOST'] + kwargs['ENDPOINT']
     headers = {'Content-Type': 'application/json',
-               'Authorization': secrets['token']}
-    data = {'tag': tag,
-            'value': value}
+               'Authorization': kwargs['TOKEN']}
+    data = {'tag': kwargs['TAG'],
+            'value': kwargs['VALUE']}
             
     resp = urequests.post(url, data=ujson.dumps(data), headers=headers)
 
@@ -40,38 +101,6 @@ def randint(min, max):
     return val
 
 
-
-print('\n\n')
-with open('secrets.json') as f:
-    secrets = ujson.loads(f.read())
-    
-# Turn off access point
-ap = network.WLAN(network.AP_IF)
-ap.active(False)
-
-# Setup WiFi connection.
-wlan = network.WLAN(network.STA_IF)
-if not wlan.isconnected():
-    wifis = wlan.scan()
-    for wifi in wifis:
-        print(wifi)
-    print('\nConnecting to WiFi.')
-    wlan.active(True)
-    wlan.connect(secrets['ssid'], secrets['pass'])
-    while not wlan.isconnected():
-        machine.idle()
-print('Connected to ' + secrets['ssid'])
-print('Network config:', wlan.ifconfig())
-
-while True:
-    value = randint(1, 1000)
-    if not button.value():
-        led.on()
-        led2.off()
-        p = api_post('test_integer', value)
-        led2.on()
-        if p == 1:
-            led.off()
-            
-
+if __name__ == "__main__":
+    main()
 
